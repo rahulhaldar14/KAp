@@ -1,40 +1,37 @@
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 import requests
-import time
 
 app = FastAPI()
 
-PLAYHT_API_KEY = "ak-4c70f443371c4aa8a5ebb7242fae3638"
-PLAYHT_USER_ID = "KtkYD7Gbl8O6TPtlcbVqVLWWbRi2"
-VOICE_ID = "s3://voice-cloning-zero-shot/ai_female_voice_4/manifest.json"  # You can customize
+ELEVENLABS_API_KEY = "sk_5e100d725208770de819733a88cbbd166d01b8835ceeb39a"
+VOICE_ID = "asDeXBMC8hUkhqqL7agO"
 
 @app.get("/")
 def root():
-    return {"message": "Kokoro Play.ht Streaming Server"}
+    return {"message": "Kokoro ElevenLabs Streaming Server"}
 
 @app.get("/stream")
 def stream_voice(text: str = "Hello from Kokoro"):
-    # Step 1: Send synthesis request
-    payload = {
-        "voice": VOICE_ID,
-        "content": [text],
-        "speed": 1.0
-    }
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}/stream"
+
     headers = {
-        "Authorization": f"Bearer {PLAYHT_API_KEY}",
-        "X-User-Id": PLAYHT_USER_ID,
+        "xi-api-key": ELEVENLABS_API_KEY,
+        "Accept": "audio/mpeg",
         "Content-Type": "application/json"
     }
 
-    res = requests.post("https://api.play.ht/api/v2/tts", json=payload, headers=headers)
-    if res.status_code != 200:
-        return {"error": "TTS request failed", "detail": res.text}
+    payload = {
+        "text": text,
+        "model_id": "eleven_monolingual_v1",
+        "voice_settings": {
+            "stability": 0.4,
+            "similarity_boost": 0.8
+        }
+    }
 
-    audio_url = res.json().get("audioUrl")
-    if not audio_url:
-        return {"error": "Audio URL not returned"}
+    response = requests.post(url, headers=headers, json=payload, stream=True)
+    if response.status_code != 200:
+        return {"error": "TTS request failed", "detail": response.text}
 
-    # Step 2: Stream audio
-    audio_stream = requests.get(audio_url, stream=True)
-    return StreamingResponse(audio_stream.iter_content(chunk_size=1024), media_type="audio/mpeg")
+    return StreamingResponse(response.iter_content(chunk_size=1024), media_type="audio/mpeg")
